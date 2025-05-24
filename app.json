@@ -1,35 +1,19 @@
 {
   "expo": {
     "name": "GroceryTracker",
-    "slug": "GroceryTracker",
+    "slug": "grocerytracker",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#f7f7f7"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
+      "package": "com.adihhmov.grocerytracker",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "extra": {
       "eas": {
-        "projectId": "cb1a3c1e-b08b-4ce4-a2e9-7534b69cb87f"
+        "projectId": "dc7d3399-60ce-431c-82ff-84ab0b31eaba"
       }
-    },
-    "owner": "adihhmov"
+    }
   }
 }
