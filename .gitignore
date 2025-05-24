@@ -35,3 +35,30 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+.vercel
+# Node modules
+node_modules/
+
+# Expo/React Native
+.expo/
+.expo-shared/
+
+# Environment files
+.env
+.env.*
+
+# macOS/Linux system files
+.DS_Store
+
+# VS Code settings (optional)
+.vscode/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android/iOS build files (in case you later eject from Expo)
+android/
+ios/

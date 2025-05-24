@@ -7,16 +7,19 @@ import * as Progress from 'react-native-progress';
 import { Picker } from '@react-native-picker/picker';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
-import { Alert, Image } from 'react-native';
+import { Alert, Image, Keyboard, Platform, Animated } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 
-import { View, Text, TextInput, Pressable, FlatList, StyleSheet, Modal, TouchableOpacity, useColorScheme } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 const formatDate = (date) => {
   return date.toLocaleDateString('en-US', { 
@@ -59,64 +62,53 @@ const getItemEmoji = (name) => {
   return '🛒';
 };
 
-function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemName, daysToFinish, setDaysToFinish }) {
+function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemName, daysToFinish, setDaysToFinish, userName }) {
+  const [search, setSearch] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+
   const currentItems = items.filter(item => !item.finished);
-  const cardRef = useRef(null);
-  const inputGroupRef = useRef(null);
+  const filteredItems = currentItems.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
 
   const [sortBy, setSortBy] = useState('urgency'); // or 'name', 'date'
-  const [category, setCategory] = useState('General');
 
-  const sortedItems = [...currentItems].sort((a, b) => {
+  const sortedItems = [...filteredItems].sort((a, b) => {
     if (sortBy === 'urgency') return a.urgencyLevel.localeCompare(b.urgencyLevel);
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
-    if (sortBy === 'date') return new Date(a.addedDate) - new Date(b.addedDate);
+    if (sortBy === 'name' ) return a.name.localeCompare(b.name);
+    if (sortBy === 'date' ) return new Date(a.addedDate) - new Date(b.addedDate);
     return 0;
   });
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <MaterialCommunityIcons name="format-list-bulleted" size={24} color="#4a7c59" style={{ marginRight: 8 }} />
           <Text style={styles.title}>Current Items</Text>
         </View>
+        {userName ? (
+          <Text style={{ fontSize: 16, color: '#4a7c59', fontWeight: '600', marginLeft: 8 }}>
+            Hello, {userName}!
+          </Text>
+        ) : null}
       </View>
 
-      <View ref={inputGroupRef} style={styles.inputGroup}>
-        <View style={styles.inputRow}>
-          <MaterialCommunityIcons name="cart-outline" size={22} color="#aaa" style={styles.inputIcon} />
-          <TextInput
-            placeholder="Item name"
-            placeholderTextColor="#999"
-            value={itemName}
-            onChangeText={setItemName}
-            style={styles.input}
-          />
-        </View>
-        <View style={styles.inputRow}>
-          <MaterialCommunityIcons name="calendar-clock" size={22} color="#aaa" style={styles.inputIcon} />
-          <TextInput
-            placeholder="Days until empty"
-            placeholderTextColor="#999"
-            value={daysToFinish}
-            onChangeText={setDaysToFinish}
-            keyboardType="numeric"
-            style={styles.input}
-          />
-        </View>
-        {/* Removed Picker for category */}
-        <Pressable 
-          onPress={addItem}
-          accessible
-          accessibilityLabel="Add item"
-          style={({ pressed }) => [
-            styles.addButton,
-            pressed && styles.buttonPressed
-          ]}
-        >
-          <Text style={styles.buttonText}>Add Item</Text>
-        </Pressable>
+      {/* Search Bar at the top */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 4 }}>
+        <TextInput
+          placeholder="Search items..."
+          value={search}
+          onChangeText={setSearch}
+          placeholderTextColor="#999"
+          style={{
+            padding: 10,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: '#ddd',
+            backgroundColor: '#fff',
+            fontSize: 16,
+            color: '#333',
+          }}
+        />
       </View>
 
       <FlatList
@@ -144,12 +136,92 @@ function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemN
             <Text style={styles.emptySubtext}>Add items to track their duration</Text>
           </Animatable.View>
         }
+        numColumns={1}
       />
+
+      {/* Floating Action Button */}
+      <Pressable
+        onPress={() => setShowAddModal(true)}
+        style={{
+          position: 'absolute',
+          bottom: 32,
+          right: 32,
+          backgroundColor: '#4a7c59',
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          alignItems: 'center',
+          justifyContent: 'center',
+          elevation: 5,
+        }}
+      >
+        <MaterialCommunityIcons name="plus" size={32} color="#fff" />
+      </Pressable>
+
+      {/* Add Item Modal */}
+      <Modal visible={showAddModal} transparent animationType="slide">
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.2)',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <View style={{
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 24,
+            width: 320,
+            alignItems: 'center'
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Add Item</Text>
+            <View style={[styles.inputRow, { marginBottom: 12 }]}>
+              <MaterialCommunityIcons name="cart-outline" size={22} color="#aaa" style={styles.inputIcon} />
+              <TextInput
+                placeholder="Item name"
+                placeholderTextColor="#999"
+                value={itemName}
+                onChangeText={setItemName}
+                style={styles.input}
+              />
+            </View>
+            <View style={[styles.inputRow, { marginBottom: 12 }]}>
+              <MaterialCommunityIcons name="calendar-clock" size={22} color="#aaa" style={styles.inputIcon} />
+              <TextInput
+                placeholder="Days until empty"
+                placeholderTextColor="#999"
+                value={daysToFinish}
+                onChangeText={setDaysToFinish}
+                keyboardType="numeric"
+                style={styles.input}
+              />
+            </View>
+            <AnimatedButton
+              style={{
+                backgroundColor: '#4a7c59',
+                borderRadius: 8,
+                padding: 14,
+                alignItems: 'center',
+                width: 160,
+              }}
+              textStyle={{ color: '#fff', fontWeight: '600', fontSize: 17 }}
+              onPress={() => {
+                addItem();
+                setShowAddModal(false);
+              }}
+            >
+              Add Item
+            </AnimatedButton>
+            <Pressable onPress={() => setShowAddModal(false)} style={{ marginTop: 12 }}>
+              <Text style={{ color: '#e4572e', fontWeight: 'bold' }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function ShoppingListScreen({ items, clearItem, clearAll }) {
+function ShoppingListScreen({ items, clearItem, clearAll, userName }) {
   const shoppingItems = items.filter(item => item.finished);
 
   return (
@@ -212,7 +284,7 @@ function CurrentItemCard({ item, markAsFinished }) {
         duration={500}
         style={[
           styles.itemCard,
-          styles[`${urgencyLevel}Priority`]
+          styles[`${item.urgencyLevel}Priority`]
         ]}
       >
         <Pressable
@@ -222,7 +294,13 @@ function CurrentItemCard({ item, markAsFinished }) {
         >
           <View style={styles.itemHeader}>
             <Text style={styles.itemEmoji}>{emoji}</Text>
-            <Text style={styles.itemName}>{item.name}</Text>
+            <Text
+              style={styles.itemName}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.name}
+            </Text>
             <View
               ref={daysLeft === 1 ? daysPillRef : null}
               style={[
@@ -240,18 +318,16 @@ function CurrentItemCard({ item, markAsFinished }) {
             <Text style={styles.dateValue}>{formatDate(new Date(item.addedDate))}</Text>
           </View>
           <Progress.Bar progress={progress} width={null} color="#4a7c59" style={{ marginTop: 8 }} />
-          <Pressable
+          <AnimatedButton
+            style={styles.actionButton}
+            textStyle={styles.actionButtonText}
             onPress={() => {
               cardRef.current.fadeOutLeft(300).then(() => markAsFinished(item.id));
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }}
-            style={({ pressed }) => [
-              styles.emptyButton,
-              pressed && styles.buttonPressed
-            ]}
           >
-            <Text style={styles.emptyButtonText}>Empty</Text>
-          </Pressable>
+            Empty
+          </AnimatedButton>
         </Pressable>
       </Animatable.View>
 
@@ -295,19 +371,16 @@ function ShoppingItemCard({ item, clearItem }) {
         <Text style={styles.dateLabel}>FINISHED:</Text>
         <Text style={styles.dateValue}>{formatDate(new Date(item.finishDate))}</Text>
       </View>
-      <Pressable
-        onPressIn={() => cardRef.current?.pulse(300)}
+      <AnimatedButton
+        style={styles.boughtButton}
+        textStyle={styles.boughtButtonText}
         onPress={() => {
           cardRef.current.fadeOutLeft(300).then(() => clearItem(item.id));
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }}
-        style={({ pressed }) => [
-          styles.boughtButton,
-          pressed && styles.buttonPressed
-        ]}
       >
-        <Text style={styles.boughtButtonText}>Bought</Text>
-      </Pressable>
+        Bought
+      </AnimatedButton>
     </Animatable.View>
   );
 }
@@ -340,10 +413,9 @@ function AboutScreen() {
           fontWeight: '400',
           lineHeight: 20,
         }}>
-          Built for everyone who keeps life running smoothly — especially all the dedicated moms, wives, daughters, and every caring soul who makes sure nothing runs out.
+          Built for everyone who keeps life running smoothly — especially all the dedicated moms, wives, daughters, and every unsung hero.
         </Text>
         <View style={{
-          backgroundColor: '#fff',
           borderRadius: 10,
           padding: 18,
           marginBottom: 18,
@@ -400,12 +472,11 @@ function SplashScreen() {
       <View style={{
         width: 160,
         height: 160,
-        borderRadius: 80, // makes it a perfect circle
+        borderRadius: 80,
         backgroundColor: '#fff',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 32,
-        // Optional: subtle shadow for depth
         shadowColor: '#000',
         shadowOpacity: 0.06,
         shadowRadius: 12,
@@ -417,7 +488,7 @@ function SplashScreen() {
           style={{
             width: 110,
             height: 110,
-            borderRadius: 55, // makes the logo itself round if it's square
+            borderRadius: 55,
             resizeMode: 'contain',
             backgroundColor: 'transparent',
           }}
@@ -447,276 +518,266 @@ function SplashScreen() {
   );
 }
 
+function WelcomeScreen({ onNameSet }) {
+  const [name, setName] = useState('');
+  const [showAnimation, setShowAnimation] = useState(false);
+
+  const handleContinue = async () => {
+    if (name.trim()) {
+      if (Platform.OS !== 'web') {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      setShowAnimation(true);
+      setTimeout(() => {
+        setShowAnimation(false);
+        onNameSet(name.trim());
+      }, 1200);
+    }
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' }}>
+      {showAnimation ? (
+        <Animatable.View animation="bounceIn" duration={900} style={{ alignItems: 'center' }}>
+          <LottieView
+            source={require('./assets/confetti.json')}
+            autoPlay
+            loop={false}
+            style={{ width: 180, height: 180 }}
+          />
+          <Text style={{ fontSize: 24, color: '#4a7c59', fontWeight: 'bold', marginTop: 16 }}>
+            Welcome, {name.trim()}!
+          </Text>
+        </Animatable.View>
+      ) : (
+        <>
+          <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#4a7c59', marginBottom: 18 }}>Welcome!</Text>
+          <Text style={{ fontSize: 16, color: '#333', marginBottom: 24, textAlign: 'center', maxWidth: 300 }}>
+            Please enter your name to personalize your Grocery Tracker experience.
+          </Text>
+          <TextInput
+            placeholder="Your name"
+            value={name}
+            onChangeText={setName}
+            style={{
+              borderWidth: 1,
+              borderColor: '#ccc',
+              borderRadius: 8,
+              padding: 12,
+              width: 240,
+              fontSize: 18,
+              marginBottom: 18,
+              backgroundColor: '#fff'
+            }}
+          />
+          <AnimatedButton
+            style={{
+              backgroundColor: '#4a7c59',
+              borderRadius: 8,
+              padding: 14,
+              alignItems: 'center',
+              width: 160,
+            }}
+            textStyle={{ color: '#fff', fontWeight: '600', fontSize: 17 }}
+            onPress={handleContinue}
+          >
+            Continue
+          </AnimatedButton>
+          <Text
+            style={{
+              position: 'absolute',
+              bottom: 24,
+              left: 0,
+              right: 0,
+              textAlign: 'center',
+              color: '#aaa',
+              fontSize: 13,
+              fontStyle: 'italic',
+            }}
+          >
+            Made by Aditya Sharma
+          </Text>
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function ChangeNameScreen({ route }) {
+  const navigation = useNavigation();
+  const [name, setName] = useState(route.params?.userName ?? '');
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={[styles.header, { borderBottomColor: '#e0e0e0' }]}>
+        <MaterialCommunityIcons name="account-edit-outline" size={26} color="#4a7c59" style={{ marginRight: 8 }} />
+        <Text style={styles.title}>Change Name</Text>
+      </View>
+      <View style={{ padding: 32 }}>
+        <Text style={{ fontSize: 16, marginBottom: 8 }}>Enter your new name:</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          style={{
+            borderWidth: 1,
+            borderColor: '#ccc',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16,
+            backgroundColor: '#fff',
+            color: '#333',
+            marginBottom: 16,
+          }}
+        />
+        <AnimatedButton
+          style={styles.settingsButton}
+          textStyle={styles.settingsButtonText}
+          onPress={async () => {
+            if ((name ?? '').trim()) {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              route.params.setUserName(name.trim());
+              navigation.navigate('MainTabs', { screen: 'Current Items' });
+            }
+          }}
+        >
+          Save
+        </AnimatedButton>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function SettingsScreen({ userName, setUserName, navigation }) {
+  // Feedback handler
+  const handleFeedback = () => {
+    Alert.alert(
+      "Feedback",
+      "Send your feedback to adityasharma24109@gmail.com",
+      [
+        { text: "Copy Email", onPress: () => {
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+              navigator.clipboard.writeText('adityasharma24109@gmail.com');
+              Alert.alert("Copied!", "Email address copied to clipboard.");
+            }
+          }
+        },
+        { text: "OK" }
+      ]
+    );
+  };
+
+  // Contact support handler
+  const handleContactSupport = () => {
+    Alert.alert(
+      "Contact Support",
+      "For support, email: adityasharma24109@gmail.com",
+      [
+        { text: "Copy Email", onPress: () => {
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+              navigator.clipboard.writeText('adityasharma24109@gmail.com');
+              Alert.alert("Copied!", "Email address copied to clipboard.");
+            }
+          }
+        },
+        { text: "OK" }
+      ]
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={[styles.header, { borderBottomColor: '#e0e0e0' }]}>
+        <MaterialCommunityIcons name="account-cog-outline" size={26} color="#4a7c59" style={{ marginRight: 8 }} />
+        <Text style={styles.title}>Settings</Text>
+      </View>
+      <View style={{ padding: 32 }}>
+        <Pressable
+          style={styles.settingsButton}
+          onPress={() => navigation.navigate('Change Name', { userName, setUserName })}
+        >
+          <Text style={styles.settingsButtonText}>Change Name</Text>
+        </Pressable>
+        <Pressable
+          style={styles.settingsButton}
+          onPress={async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleFeedback();
+          }}
+        >
+          <Text style={styles.settingsButtonText}>Send Feedback</Text>
+        </Pressable>
+        <Pressable
+          style={styles.settingsButtonDestructive}
+          onPress={async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleContactSupport();
+          }}
+        >
+          <Text style={styles.settingsButtonDestructiveText}>Contact Support</Text>
+        </Pressable>
+      </View>
+      {/* Version at the bottom */}
+      <View style={{
+        position: 'absolute',
+        bottom: 24,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+      }}>
+        <Text style={{ fontSize: 14, color: '#888' }}>
+          Version <Text style={{ color: '#4a7c59', fontWeight: '600' }}>1.0.0</Text>
+        </Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// Animated Button Component
+const AnimatedButton = ({ style, textStyle, onPress, children, ...props }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        style={style}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={onPress}
+        {...props}
+      >
+        {typeof children === 'string'
+          ? <Text style={textStyle}>{children}</Text>
+          : children}
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 // Main App component
 export default function App() {
   const [itemName, setItemName] = useState('');
   const [daysToFinish, setDaysToFinish] = useState('');
   const [items, setItems] = useState([]);
   const [showSplash, setShowSplash] = useState(true);
+  const [userName, setUserName] = useState('');
+  const [showNameModal, setShowNameModal] = useState(false);
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const dynamicStyles = {
-    container: {
-      flex: 1,
-      backgroundColor: isDark ? '#181a20' : '#f8f9fa',
-    },
-    header: {
-      padding: 20,
-      paddingBottom: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-    },
-    title: {
-      fontSize: 22,
-      fontWeight: '600',
-      color: isDark ? '#fff' : '#333',
-    },
-    inputGroup: {
-      padding: 20,
-      paddingBottom: 10,
-    },
-    inputRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: '#ddd',
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 12,
-      backgroundColor: isDark ? '#23262f' : '#fff',
-    },
-    inputIcon: {
-      marginRight: 10,
-    },
-    input: {
-      flex: 1,
-      fontSize: 16,
-      color: isDark ? '#fff' : '#333',
-    },
-    addButton: {
-      backgroundColor: '#4a7c59',
-      borderRadius: 8,
-      padding: 15,
-      alignItems: 'center',
-    },
-    buttonPressed: {
-      opacity: 0.8,
-    },
-    buttonText: {
-      color: '#fff',
-      fontWeight: '500',
-      fontSize: 16,
-    },
-    listContent: {
-      padding: 24,
-      paddingTop: 16,
-    },
-    itemCard: {
-      backgroundColor: isDark ? '#23262f' : '#fff',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-      borderLeftWidth: 4,
-      // Shadow for iOS
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 8,
-      // Elevation for Android
-      elevation: 3,
-    },
-    lowPriority: {
-      borderLeftColor: '#a5c882',
-    },
-    mediumPriority: {
-      borderLeftColor: '#e6af2e',
-    },
-    highPriority: {
-      borderLeftColor: '#e4572e',
-    },
-    itemHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    itemEmoji: {
-      fontSize: 26,
-      marginRight: 8,
-      marginLeft: -2,
-      alignSelf: 'center',
-    },
-    itemName: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: isDark ? '#fff' : '#222',
-      flex: 1,
-      marginLeft: 2,
-    },
-    daysPill: {
-      borderRadius: 12,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      marginLeft: 10,
-    },
-    lowPill: {
-      backgroundColor: '#a5c882',
-    },
-    mediumPill: {
-      backgroundColor: '#e6af2e',
-    },
-    highPill: {
-      backgroundColor: '#e4572e',
-    },
-    daysText: {
-      color: '#fff',
-      fontWeight: '600',
-      fontSize: 13,
-    },
-    dateRow: {
-      flexDirection: 'row',
-      marginBottom: 6,
-    },
-    dateLabel: {
-      fontSize: 12,
-      color: '#aaa',
-      textTransform: 'uppercase',
-      fontWeight: '600',
-      width: 60,
-      letterSpacing: 1,
-    },
-    dateValue: {
-      fontSize: 13,
-      color: '#666',
-      flexShrink: 1,
-      flexWrap: 'wrap',
-    },
-    actionButton: {
-      marginTop: 10,
-      padding: 10,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: '#ddd',
-      alignItems: 'center',
-    },
-    actionButtonText: {
-      color: '#e4572e',
-      fontWeight: '500',
-    },
-    shoppingCard: {
-      backgroundColor: isDark ? '#23262f' : '#fff',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-      borderLeftWidth: 4,
-      flex: 1,
-      margin: 8,
-      minWidth: 0,
-      maxWidth: '48%',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      minHeight: 120,
-      // Shadow for iOS
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 8,
-      // Elevation for Android
-      elevation: 3,
-    },
-    emptyState: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 40,
-    },
-    emptyText: {
-      fontSize: 18,
-      color: '#999',
-      marginTop: 16,
-      fontWeight: '500',
-    },
-    emptySubtext: {
-      fontSize: 14,
-      color: '#bbb',
-      textAlign: 'center',
-    },
-    boughtButton: {
-      marginTop: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 18,
-      borderRadius: 6,
-      backgroundColor: '#4a7c59',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-    },
-    boughtButtonText: {
-      color: '#fff',
-      fontWeight: '600',
-      fontSize: 15,
-    },
-    emptyButton: {
-      paddingVertical: 6,
-      paddingHorizontal: 18,
-      backgroundColor: '#fff',
-      borderColor: '#e4572e',
-      borderWidth: 1,
-      borderRadius: 20,
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      marginTop: 8,
-      minWidth: 70,
-    },
-    emptyButtonText: {
-      fontWeight: '600',
-      color: '#e4572e',
-      fontSize: 14,
-      letterSpacing: 0.5,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.1)',
-      justifyContent: 'flex-start',
-      alignItems: 'flex-end',
-    },
-    menuModal: {
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      paddingHorizontal: 18,
-      marginTop: 60,
-      marginRight: 20,
-      // Shadow for iOS
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 8,
-      // Elevation for Android
-      elevation: 3,
-    },
-    clearAllButton: {
-      paddingVertical: 8,
-      paddingHorizontal: 10,
-    },
-    clearAllButtonText: {
-      color: '#e4572e',
-      fontWeight: '600',
-      fontSize: 16,
-    },
-    menuButton: {
-      position: 'absolute',
-      right: 16,
-      top: 18,
-      padding: 6,
-      zIndex: 10,
-    },
-    modalOverlayActive: {
-      flex: 1,
-      backgroundColor: 'rgba(30, 60, 120, 0.18)', // subtle blue overlay
-      justifyContent: 'flex-start',
-      alignItems: 'flex-end',
-    },
-  };
+  const inputGroupRef = useRef(null);
 
   const addItem = () => {
     if (!itemName.trim() || !daysToFinish.trim()) {
@@ -731,7 +792,6 @@ export default function App() {
     const finishDate = new Date(today);
     finishDate.setDate(today.getDate() + days);
 
-    // Determine urgencyLevel
     let urgencyLevel = 'low';
     if (days <= 3) urgencyLevel = 'high';
     else if (days <= 7) urgencyLevel = 'medium';
@@ -742,15 +802,16 @@ export default function App() {
       addedDate: today.toISOString(),
       finishDate: finishDate.toISOString(),
       finished: false,
-      urgencyLevel, // Save the color level
+      urgencyLevel,
     };
 
     setItems([...items, newItem]);
     setItemName('');
     setDaysToFinish('');
 
-    // Schedule notifications
     scheduleItemNotifications(newItem.name, finishDate);
+
+    Keyboard.dismiss(); // Hide keyboard after adding item
   };
 
   const markAsFinished = (id) => {
@@ -783,6 +844,10 @@ export default function App() {
     AsyncStorage.getItem('groceryItems').then(data => {
       if (data) setItems(JSON.parse(data));
     });
+    AsyncStorage.getItem('userName').then(name => {
+      if (name) setUserName(name);
+      else setShowNameModal(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -790,19 +855,25 @@ export default function App() {
   }, [items]);
 
   useEffect(() => {
+    if (userName) {
+      AsyncStorage.setItem('userName', userName);
+      setShowNameModal(false);
+    }
+  }, [userName]);
+
+  useEffect(() => {
     Notifications.requestPermissionsAsync();
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 1800); // 1.8 seconds
+    const timer = setTimeout(() => setShowSplash(false), 1800);
     return () => clearTimeout(timer);
   }, []);
 
   async function scheduleItemNotifications(itemName, finishDate) {
-    // Notification for 2 days left
     const twoDaysLeft = new Date(finishDate);
     twoDaysLeft.setDate(twoDaysLeft.getDate() - 2);
-    twoDaysLeft.setHours(9, 0, 0, 0); // 9 AM
+    twoDaysLeft.setHours(9, 0, 0, 0);
 
     if (twoDaysLeft > new Date()) {
       await Notifications.scheduleNotificationAsync({
@@ -814,9 +885,8 @@ export default function App() {
       });
     }
 
-    // Notification for finish day
     const finishDay = new Date(finishDate);
-    finishDay.setHours(9, 0, 0, 0); // 9 AM
+    finishDay.setHours(9, 0, 0, 0);
 
     if (finishDay > new Date()) {
       await Notifications.scheduleNotificationAsync({
@@ -831,62 +901,116 @@ export default function App() {
 
   if (showSplash) return <SplashScreen />;
 
+  if (!userName) {
+    return (
+      <SafeAreaProvider>
+        <WelcomeScreen
+          onNameSet={async (name) => {
+            setUserName(name);
+            await AsyncStorage.setItem('userName', name);
+          }}
+        />
+      </SafeAreaProvider>
+    );
+  }
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            tabBarIcon: ({ focused, color, size }) => {
-              let iconName;
-              if (route.name === 'Current Items') {
-                iconName = focused ? 'format-list-checks' : 'format-list-bulleted';
-              } else if (route.name === 'Shopping List') {
-                iconName = focused ? 'cart' : 'cart-outline';
-              } else {
-                iconName = focused ? 'information' : 'information-outline';
-              }
-              return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
-            },
-            tabBarActiveTintColor: '#4a7c59',
-            tabBarInactiveTintColor: '#999',
-            tabBarStyle: {
-              backgroundColor: '#f8f9fa',
-              borderTopWidth: 1,
-              borderTopColor: '#eee',
-              height: 60,
-              paddingBottom: 5
-            },
-            headerShown: false,
-          })}
-        >
-          <Tab.Screen name="Current Items">
-            {() => (
-              <CurrentItemsScreen
-                items={items}
-                markAsFinished={markAsFinished}
-                addItem={addItem}
-                itemName={itemName}
-                setItemName={setItemName}
-                daysToFinish={daysToFinish}
-                setDaysToFinish={setDaysToFinish}
-              />
-            )}
-          </Tab.Screen>
-          <Tab.Screen name="Shopping List">
-            {() => <ShoppingListScreen items={items} clearItem={clearItem} clearAll={clearAll} />}
-          </Tab.Screen>
-          <Tab.Screen
-            name="About"
-            component={AboutScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => (
-                <MaterialCommunityIcons name="information-outline" size={size} color={color} />
-              ),
-            }}
-          />
-        </Tab.Navigator>
-      </NavigationContainer>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MainTabs">
+              {() => (
+                <Tab.Navigator
+                  screenOptions={({ route }) => ({
+                    tabBarIcon: ({ focused, color, size }) => {
+                      let iconName;
+                      if (route.name === 'Current Items') {
+                        iconName = focused ? 'format-list-checks' : 'format-list-bulleted';
+                      } else if (route.name === 'Shopping List') {
+                        iconName = focused ? 'cart' : 'cart-outline';
+                      } else if (route.name === 'About') {
+                        iconName = focused ? 'information' : 'information-outline';
+                      } else if (route.name === 'Settings') {
+                        iconName = 'account-cog-outline';
+                      }
+                      return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+                    },
+                    tabBarActiveTintColor: '#4a7c59',
+                    tabBarInactiveTintColor: '#999',
+                    tabBarStyle: {
+                      backgroundColor: '#f8f9fa',
+                      borderTopWidth: 1,
+                      borderTopColor: '#eee',
+                      height: 60,
+                      paddingBottom: 5
+                    },
+                    headerShown: false,
+                  })}
+                >
+                  <Tab.Screen name="Current Items">
+                    {() => (
+                      <CurrentItemsScreen
+                        items={items}
+                        markAsFinished={markAsFinished}
+                        addItem={addItem}
+                        itemName={itemName}
+                        setItemName={setItemName}
+                        daysToFinish={daysToFinish}
+                        setDaysToFinish={setDaysToFinish}
+                        userName={userName}
+                      />
+                    )}
+                  </Tab.Screen>
+                  <Tab.Screen name="Shopping List">
+                    {() => (
+                      <ShoppingListScreen
+                        items={items}
+                        clearItem={clearItem}
+                        clearAll={clearAll}
+                        userName={userName}
+                      />
+                    )}
+                  </Tab.Screen>
+                  <Tab.Screen
+                    name="About"
+                    component={AboutScreen}
+                    options={{
+                      tabBarIcon: ({ color, size }) => (
+                        <MaterialCommunityIcons name="information-outline" size={size} color={color} />
+                      ),
+                    }}
+                  />
+                  <Tab.Screen
+                    name="Settings"
+                    options={{
+                      tabBarIcon: ({ color, size }) => (
+                        <MaterialCommunityIcons name="account-cog-outline" size={size} color={color} />
+                      ),
+                    }}
+                  >
+                    {({ navigation }) => (
+                      <SettingsScreen
+                        userName={userName}
+                        setUserName={setUserName}
+                        navigation={navigation}
+                      />
+                    )}
+                  </Tab.Screen>
+                </Tab.Navigator>
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Change Name">
+              {({ route }) => (
+                <ChangeNameScreen
+                  route={route}
+                />
+              )}
+            </Stack.Screen>
+          </Stack.Navigator>
+        </NavigationContainer>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
@@ -943,8 +1067,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   listContent: {
-    padding: 24,
+    paddingHorizontal: 8,
     paddingTop: 16,
+    paddingBottom: 24,
   },
   itemCard: {
     backgroundColor: '#fff',
@@ -952,13 +1077,14 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderLeftWidth: 4,
-    // Shadow for iOS
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    // Elevation for Android
-    elevation: 3,
+    shadowOpacity: 0.05, // softer shadow
+    shadowRadius: 6,     // softer shadow
+    elevation: 2,        // softer shadow
+    marginHorizontal: 8,
+    flex: 1,
+    minWidth: 0,
   },
   lowPriority: {
     borderLeftColor: '#a5c882',
@@ -971,9 +1097,8 @@ const styles = StyleSheet.create({
   },
   itemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
   itemEmoji: {
     fontSize: 26,
@@ -985,8 +1110,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#222',
-    flex: 1,
+    flex: 2,
     marginLeft: 2,
+    flexShrink: 1,
+    flexWrap: 'nowrap',
+    minWidth: 0,
   },
   daysPill: {
     borderRadius: 12,
@@ -1028,15 +1156,21 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginTop: 10,
-    padding: 10,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 18,
+    backgroundColor: '#f3f4f6', // soft neutral
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    elevation: 0,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   actionButtonText: {
-    color: '#e4572e',
-    fontWeight: '500',
+    color: '#4a7c59', // accent color
+    fontWeight: '600',
+    fontSize: 16,
+    letterSpacing: 0.2,
   },
   shoppingCard: {
     backgroundColor: '#fff',
@@ -1051,13 +1185,93 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'space-between',
     minHeight: 120,
-    // Shadow for iOS
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    // Elevation for Android
-    elevation: 3,
+    shadowOpacity: 0.05, // softer shadow
+    shadowRadius: 6,     // softer shadow
+    elevation: 2,        // softer shadow
+  },
+  boughtButton: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 18,
+    backgroundColor: '#f3f4f6', // soft neutral
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    elevation: 0,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  boughtButtonText: {
+    color: '#4a7c59', // accent color
+    fontWeight: '600',
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+  clearAllButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  clearAllButtonText: {
+    color: '#e4572e',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  menuButton: {
+    position: 'absolute',
+    right: 16,
+    top: 18,
+    padding: 6,
+    zIndex: 10,
+  },
+  modalOverlayActive: {
+    flex: 1,
+    backgroundColor: 'rgba(30, 60, 120, 0.18)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  darkModeButton: {
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    width: 160,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginTop: 8,
+  },
+  // Settings tab minimalist buttons
+  settingsButton: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 18,
+    padding: 14,
+    alignItems: 'center',
+    width: 180,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  settingsButtonText: {
+    color: '#4a7c59',
+    fontWeight: '600',
+    fontSize: 17,
+  },
+  settingsButtonDestructive: {
+    backgroundColor: '#fbeaea',
+    borderRadius: 18,
+    padding: 14,
+    alignItems: 'center',
+    width: 180,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#f5c6cb',
+  },
+  settingsButtonDestructiveText: {
+    color: '#e4572e',
+    fontWeight: '600',
+    fontSize: 17,
   },
   emptyState: {
     alignItems: 'center',
@@ -1074,79 +1288,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#bbb',
     textAlign: 'center',
-  },
-  boughtButton: {
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 6,
-    backgroundColor: '#4a7c59',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-  },
-  boughtButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  emptyButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 18,
-    backgroundColor: '#fff',
-    borderColor: '#e4572e',
-    borderWidth: 1,
-    borderRadius: 20,
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    minWidth: 70,
-  },
-  emptyButtonText: {
-    fontWeight: '600',
-    color: '#e4572e',
-    fontSize: 14,
-    letterSpacing: 0.5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-  },
-  menuModal: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 18,
-    marginTop: 60,
-    marginRight: 20,
-    // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    // Elevation for Android
-    elevation: 3,
-  },
-  clearAllButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  clearAllButtonText: {
-    color: '#e4572e',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  menuButton: {
-    position: 'absolute',
-    right: 16,
-    top: 18,
-    padding: 6,
-    zIndex: 10,
-  },
-  modalOverlayActive: {
-    flex: 1,
-    backgroundColor: 'rgba(30, 60, 120, 0.18)', // subtle blue overlay
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
   },
 });
