@@ -5,7 +5,11 @@ self.addEventListener('install', event => {
       return cache.addAll([
         '/',
         '/index.html',
-        // Add other assets you want to cache
+        '/_expo/static/js/web/index-c2307de3d8f8a955de2157ec0da421b6.js',
+        '/manifest.json',
+        '/icon-192.png',
+        '/icon-512.png',
+        // Add other assets as needed
       ]);
     })
   );
