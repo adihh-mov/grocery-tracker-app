@@ -26,25 +26,32 @@
       "url": "https://u.expo.dev/dc7d3399-60ce-431c-82ff-84ab0b31eaba"
     },
     "web": {
+      "favicon": "./assets/favicon.png",
+      "build": {},
       "display": "standalone",
       "start_url": "/?source=pwa",
       "scope": "/",
       "theme_color": "#ffffff",
       "background_color": "#ffffff",
-      "icons": [
-        {
-          "src": "/icons/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png",
-          "purpose": "any maskable"
-        },
-        {
-          "src": "/icons/icon-512.png",
-          "sizes": "512x512",
-          "type": "image/png",
-          "purpose": "any maskable"
-        }
-      ]
+      "manifest": {
+        "short_name": "GroceryApp",
+        "description": "Track groceries and get notified before they run out.",
+        "orientation": "portrait",
+        "icons": [
+          {
+            "src": "./assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+          },
+          {
+            "src": "./assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+          }
+        ]
+      }
     }
   }
 }
