@@ -44,13 +44,6 @@
           "type": "image/png",
           "purpose": "any maskable"
         }
-      ],
-      "screenshots": [
-        {
-          "src": "/screenshots/screen1.png",
-          "sizes": "1080x1920",
-          "type": "image/png"
-        }
       ]
     }
   }

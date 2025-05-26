@@ -62,7 +62,7 @@ const getItemEmoji = (name) => {
   return '🛒';
 };
 
-function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemName, daysToFinish, setDaysToFinish, userName }) {
+function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemName, daysToFinish, setDaysToFinish, userName, inputGroupRef, clearItem }) {
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -128,7 +128,8 @@ function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemN
           >
             <CurrentItemCard item={item} markAsFinished={markAsFinished} />
           </Swipeable>
-        )}
+        )
+        }
         ListEmptyComponent={
           <Animatable.View animation="fadeInUp" duration={600} style={styles.emptyState}>
             <MaterialCommunityIcons name="cart-outline" size={48} color="#ccc" />
@@ -174,27 +175,29 @@ function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemN
             alignItems: 'center'
           }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Add Item</Text>
-            <View style={[styles.inputRow, { marginBottom: 12 }]}>
-              <MaterialCommunityIcons name="cart-outline" size={22} color="#aaa" style={styles.inputIcon} />
-              <TextInput
-                placeholder="Item name"
-                placeholderTextColor="#999"
-                value={itemName}
-                onChangeText={setItemName}
-                style={styles.input}
-              />
-            </View>
-            <View style={[styles.inputRow, { marginBottom: 12 }]}>
-              <MaterialCommunityIcons name="calendar-clock" size={22} color="#aaa" style={styles.inputIcon} />
-              <TextInput
-                placeholder="Days until empty"
-                placeholderTextColor="#999"
-                value={daysToFinish}
-                onChangeText={setDaysToFinish}
-                keyboardType="numeric"
-                style={styles.input}
-              />
-            </View>
+            <Animatable.View ref={inputGroupRef} style={{ width: '100%' }}>
+              <View style={[styles.inputRow, { marginBottom: 12 }]}>
+                <MaterialCommunityIcons name="cart-outline" size={22} color="#aaa" style={styles.inputIcon} />
+                <TextInput
+                  placeholder="Item name"
+                  placeholderTextColor="#999"
+                  value={itemName}
+                  onChangeText={setItemName}
+                  style={styles.input}
+                />
+              </View>
+              <View style={[styles.inputRow, { marginBottom: 12 }]}>
+                <MaterialCommunityIcons name="calendar-clock" size={22} color="#aaa" style={styles.inputIcon} />
+                <TextInput
+                  placeholder="Days until empty"
+                  placeholderTextColor="#999"
+                  value={daysToFinish}
+                  onChangeText={setDaysToFinish}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+              </View>
+            </Animatable.View>
             <AnimatedButton
               style={{
                 backgroundColor: '#4a7c59',
@@ -205,8 +208,9 @@ function CurrentItemsScreen({ items, markAsFinished, addItem, itemName, setItemN
               }}
               textStyle={{ color: '#fff', fontWeight: '600', fontSize: 17 }}
               onPress={() => {
-                addItem();
-                setShowAddModal(false);
+                if (addItem()) {
+                  setShowAddModal(false);
+                }
               }}
             >
               Add Item
@@ -271,8 +275,13 @@ function CurrentItemCard({ item, markAsFinished }) {
   const [selectedItem, setSelectedItem] = useState(null);
 
   useEffect(() => {
-    if (daysLeft === 1) {
-      daysPillRef.current?.pulse(1000);
+    if (
+      Platform.OS !== 'web' &&
+      daysLeft === 1 &&
+      daysPillRef.current &&
+      typeof daysPillRef.current.pulse === 'function'
+    ) {
+      daysPillRef.current.pulse(1000);
     }
   }, [daysLeft]);
 
@@ -288,7 +297,11 @@ function CurrentItemCard({ item, markAsFinished }) {
         ]}
       >
         <Pressable
-          onPressIn={() => cardRef.current?.pulse(300)}
+          onPressIn={() => {
+            if (cardRef.current && typeof cardRef.current.pulse === 'function') {
+              cardRef.current.pulse(300);
+            }
+          }}
           onPress={() => setSelectedItem(item)}
           style={{ flex: 1 }}
         >
@@ -322,8 +335,14 @@ function CurrentItemCard({ item, markAsFinished }) {
             style={styles.actionButton}
             textStyle={styles.actionButtonText}
             onPress={() => {
-              cardRef.current.fadeOutLeft(300).then(() => markAsFinished(item.id));
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (cardRef.current && typeof cardRef.current.fadeOutLeft === 'function') {
+                cardRef.current.fadeOutLeft(300).then(() => markAsFinished(item.id));
+              } else {
+                markAsFinished(item.id);
+              }
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
             }}
           >
             Empty
@@ -375,8 +394,14 @@ function ShoppingItemCard({ item, clearItem }) {
         style={styles.boughtButton}
         textStyle={styles.boughtButtonText}
         onPress={() => {
-          cardRef.current.fadeOutLeft(300).then(() => clearItem(item.id));
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (cardRef.current && typeof cardRef.current.fadeOutLeft === 'function') {
+            cardRef.current.fadeOutLeft(300).then(() => clearItem(item.id));
+          } else {
+            clearItem(item.id);
+          }
+          if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
         }}
       >
         Bought
@@ -781,12 +806,15 @@ export default function App() {
 
   const addItem = () => {
     if (!itemName.trim() || !daysToFinish.trim()) {
-      inputGroupRef.current?.shake(500);
-      return;
+      inputGroupRef.current?.shake?.(500);
+      return false; // indicate failure
     }
 
-    const days = parseInt(daysToFinish);
-    if (isNaN(days) || days <= 0) return;
+    const days = parseInt(daysToFinish, 10);
+    if (isNaN(days) || days <= 0) {
+      inputGroupRef.current?.shake?.(500);
+      return false; // indicate failure
+    }
 
     const today = new Date();
     const finishDate = new Date(today);
@@ -811,7 +839,8 @@ export default function App() {
 
     scheduleItemNotifications(newItem.name, finishDate);
 
-    Keyboard.dismiss(); // Hide keyboard after adding item
+    Keyboard.dismiss();
+    return true; // indicate success
   };
 
   const markAsFinished = (id) => {
@@ -870,7 +899,24 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    // Auto-move expired items to Shopping List
+    const now = new Date();
+    const updated = items.map(item => {
+      if (!item.finished && new Date(item.finishDate) < now) {
+        return { ...item, finished: true };
+      }
+      return item;
+    });
+    // Only update if something changed
+    if (JSON.stringify(updated) !== JSON.stringify(items)) {
+      setItems(updated);
+    }
+  }, [items]);
+
   async function scheduleItemNotifications(itemName, finishDate) {
+    if (Platform.OS === 'web') return; // <-- add this line
+
     const twoDaysLeft = new Date(finishDate);
     twoDaysLeft.setDate(twoDaysLeft.getDate() - 2);
     twoDaysLeft.setHours(9, 0, 0, 0);
@@ -959,6 +1005,8 @@ export default function App() {
                         daysToFinish={daysToFinish}
                         setDaysToFinish={setDaysToFinish}
                         userName={userName}
+                        inputGroupRef={inputGroupRef}
+                        clearItem={clearItem} // <-- add this line
                       />
                     )}
                   </Tab.Screen>
