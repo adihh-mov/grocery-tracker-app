@@ -3,7 +3,15 @@ const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  // Add other assets like CSS, JS, icons, etc.
+  '/metadata.json',
+  '/favicon.ico',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/service-worker.js',
+  // Add asset files inside /assets if needed, e.g.:
+  // '/assets/logo.png',
+  // '/assets/other-image.png',
+  // Add more as needed
 ];
 
 self.addEventListener('install', event => {
